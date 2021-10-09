@@ -27,7 +27,7 @@ NETWORK_PROTOCOL="tcp"
 # Loops through each port and starts a collector instance the background via screen.
 for startup in $PORTS ; do
   echo -e "[INFO] starting honeypot on port $startup...."
-  screen -A -m -d -S gnx-hpot-$startup bash gnx-pot-collector.sh $startup $NETWORK_PROTOCOL &
+  screen -A -m -d -S gnx-hpot-$startup bash gnx-honey-initiate.sh $startup $NETWORK_PROTOCOL &
   sleep 2
 done
 
