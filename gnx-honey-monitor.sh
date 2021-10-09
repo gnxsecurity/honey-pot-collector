@@ -35,7 +35,7 @@ readonly OUTPUT_DIR="./output"
 readonly LOGFILE="/var/log/gnx-honey.log"
 
 # Location of collector script (default recommended), this gets executed each time a connection is made to record IP information.
-readonly RESPONSE_SCRIPT="ip-collector.sh"
+readonly RESPONSE_SCRIPT="gnx-honey-collector.sh"
 
 # Method (ncat, netcat/nc, tcpserver), defaults to ncat.
 readonly METHOD="ncat"
