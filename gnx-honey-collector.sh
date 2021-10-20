@@ -25,18 +25,17 @@ sleep 0.5
 
 # Looop through our whitelisted IP addresses and delete if a match isf ound
 if [ -n "$NCAT_REMOTE_ADDR" ] ; then
-
     for patregex in ${WHITE_LIST//,/ } ; do 
         TO_BLOCK=$(echo $NCAT_REMOTE_ADDR | sed "/$patregex/d") &> /dev/null
         if [ -z "$TO_BLOCK" ] ; then
-            echo -e "$(date +%D-%R:%S) $SELF_NAME($SELF_PID): [WARN] IP address[$NCAT_REMOTE_ADDR] is in the WHITE_LIST, skipping..." >> $LOGFILE
+            echo -e "$(date +%D-%R:%S) $SELF_NAME[$SELF_PID]: [WARN] IP address[$NCAT_REMOTE_ADDR] is in the WHITE_LIST, skipping..." >> $LOGFILE
             exit 1
         fi
     done
 
     if [ -n "$TO_BLOCK" ] ; then
 
-        echo -e "$(date +%D-%R:%S) $SELF_NAME($SELF_PID)]: [NOTICE] detected connection from [$NCAT_REMOTE_ADDR] on port [$NCAT_LOCAL_PORT] adding to collection..." >> $LOGFILE
+        echo -e "$(date +%D-%R:%S) $SELF_NAME[$SELF_PID]: [NOTICE] detected connection from [$NCAT_REMOTE_ADDR] on port [$NCAT_LOCAL_PORT] adding to collection..." >> $LOGFILE
         echo "$TO_BLOCK" >> $OUTPUT_FILE
     fi
 fi
