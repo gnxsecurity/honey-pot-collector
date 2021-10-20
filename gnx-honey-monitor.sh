@@ -105,28 +105,28 @@ function pront(){
 
 function gen_stats(){
     echo "$(printf '%125s\n' | tr ' ' -)" >> $LOGFILE
-    if ! compgen -G "$OUTPUT_DIR/ip-list-*" > /dev/null ; then
+    if ! compgen -G "$OUTPUT_DIR/ip-collection-*" > /dev/null ; then
         log_it "[ERROR] no suitable files exist in directory [$OUTPUT_DIR] to generate statistics"
         exit 1
-    elif [[ "$(cat $OUTPUT_DIR/ip-list-* | wc -l)" -lt "10" ]] ; then
+    elif [[ "$(cat $OUTPUT_DIR/ip-collection-* | wc -l)" -lt "10" ]] ; then
         log_it "[ERROR] not enough data currently to generate statistics, as less than 10 records exist..."
         exit 1 
     fi       
 
     pront "all-time activity"
-    echo -e "All-time total hits: $RED[$(cat $OUTPUT_DIR/ip-list-* | wc -l)] $RESET"
-    echo -e "Sources with multiple hits: $RED[$(cat $OUTPUT_DIR/ip-list-* | sort | uniq -c | sort -nr | grep -v -e '[[:blank:]]1[[:space:]][[:digit:]]' | wc -l)]$RESET"
-    echo -e "Unique sources with multiple at least one hit: $RED[$(cat $OUTPUT_DIR/ip-list-* | uniq -c | wc -l)]$RESET"
+    echo -e "All-time total hits: $RED[$(cat $OUTPUT_DIR/ip-collection-* | wc -l)] $RESET"
+    echo -e "Sources with multiple hits: $RED[$(cat $OUTPUT_DIR/ip-collection-* | sort | uniq -c | sort -nr | grep -v -e '[[:blank:]]1[[:space:]][[:digit:]]' | wc -l)]$RESET"
+    echo -e "Unique sources with multiple at least one hit: $RED[$(cat $OUTPUT_DIR/ip-collection-* | uniq -c | wc -l)]$RESET"
 
     IFS=$'\n'
     pront "Top sources connected"
-    for xhit in $(cat $OUTPUT_DIR/ip-list-* | sort | uniq -c | sed 's/^ *//' | sort -nr | head -n 10) ; do
+    for xhit in $(cat $OUTPUT_DIR/ip-collection-* | sort | uniq -c | sed 's/^ *//' | sort -nr | head -n 10) ; do
       echo "$RED$(echo $xhit | awk '{print $1}') $RESET $(echo $xhit | awk '{print $2}') "
     done
     IFS=" "
 
     pront "Top ports accessed"
-    echo "$RED$(du -hsx $OUTPUT_DIR/* | grep "ip-list" | sort -rn | awk '{print $2}' | grep -Eo '[0-9]{1,9}' | head -n 5) $RESET"
+    echo "$RED$(du -hsx $OUTPUT_DIR/* | grep "ip-collection" | sort -rn | awk '{print $2}' | grep -Eo '[0-9]{1,9}' | head -n 5) $RESET"
     exit 0
 
 }
