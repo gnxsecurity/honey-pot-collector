@@ -56,6 +56,17 @@ readonly NET_METH="$(which $METHOD)"
 readonly SELF_PID="$$"
 readonly SELF_NAME="$(basename $0)"
 
+##########################################
+####             [LOGGER]             ####
+##########################################
+
+function log_it(){
+    if [[ "$1" =~ "INFO" ]] ; then
+        echo -e "$(date +%D-%R:%S) $(basename $0)[$SELF_PID]: $1" >> $LOGFILE
+    else
+        echo -e "$(date +%D-%R:%S) $(basename $0)[$SELF_PID]: $1" | tee -a $LOGFILE
+    fi
+}
 
 ##########################################
 ####             [PRIMER]             ####
@@ -64,10 +75,16 @@ readonly SELF_NAME="$(basename $0)"
 
 readonly PROTOCOL="$(echo $PROTOCOL | awk '{print tolower($0)}')"
 
+log_it "[INFO] checking system for netstat or ss capabilities..."
 if [ "$(which netstat &> /dev/null ; echo $?)" -ne "0" ] ; then
     readonly C_METHOD="$(which ss)"
 else
     readonly C_METHOD="$(which netstat)"
+fi
+
+if [ -z "$METHOD" ] ; then
+    log_it "[ERROR] selected method [$METHOD] either doesn't exist or is blank, please check and try again"
+    exit 1
 fi
 
 ##########################################
@@ -75,7 +92,6 @@ fi
 ##########################################
 
 function is_port_available(){
-    log_it "[INFO[ checking $PROTOCOL availability port using [$C_METHOD]..."
     if [ $($C_METHOD -ltun | grep -E "*:$LISTEN_PORT[[:space:]]" &> /dev/null ; echo $?) -eq "0" ]; then
         STATE="1" ; false
     else
@@ -83,30 +99,34 @@ function is_port_available(){
     fi
 }
 
-function log_it(){
-    echo -e "$(date +%D-%R:%S) $(basename $0)[$SELF_PID] $1" | tee -a $LOGFILE
+function pront(){
+    echo -e "$GREEN$(printf '%25s\n' | tr ' ' -)$1$(printf '%25s\n' | tr ' ' -)$RESET"
 }
 
 function gen_stats(){
-    log_it "[INFO] executed with [$LISTEN_PORT] command line argument, running statistics function..."
-    #printf '%120s\n' | tr ' ' -
-    
-    echo -e "$GREEN$(basename $0) all-time activity....$RESET"
-    echo -e "All-time total hits: $RED[$(cat output/ip-list-* | wc -l)] $RESET"
-    echo -e "Sources with multiple hits: $RED[$(cat output/ip-list-* | sort | uniq -c | sort -nr | grep -v -e '[[:blank:]]1[[:space:]][[:digit:]]' | wc -l)]$RESET"
-    echo -e "Unique sources with multiple at least one hit: $RED[$(cat output/ip-list-* | uniq -c | wc -l)]$RESET"
+    echo "$(printf '%125s\n' | tr ' ' -)" >> $LOGFILE
+    if ! compgen -G "$OUTPUT_DIR/ip-list-*" > /dev/null ; then
+        log_it "[ERROR] no suitable files exist in directory [$OUTPUT_DIR] to generate statistics"
+        exit 1
+    elif [[ "$(cat $OUTPUT_DIR/ip-list-* | wc -l)" -lt "10" ]] ; then
+        log_it "[ERROR] not enough data currently to generate statistics, as less than 10 records exist..."
+        exit 1 
+    fi       
+
+    pront "all-time activity"
+    echo -e "All-time total hits: $RED[$(cat $OUTPUT_DIR/ip-list-* | wc -l)] $RESET"
+    echo -e "Sources with multiple hits: $RED[$(cat $OUTPUT_DIR/ip-list-* | sort | uniq -c | sort -nr | grep -v -e '[[:blank:]]1[[:space:]][[:digit:]]' | wc -l)]$RESET"
+    echo -e "Unique sources with multiple at least one hit: $RED[$(cat $OUTPUT_DIR/ip-list-* | uniq -c | wc -l)]$RESET"
 
     IFS=$'\n'
-    echo -e "$GREEN$(basename $0) Top 10 sources:"
-    for xhit in $(cat output/ip-list-* | sort | uniq -c | sed 's/^ *//' | sort -nr | head -n 10) ; do
+    pront "Top sources connected"
+    for xhit in $(cat $OUTPUT_DIR/ip-list-* | sort | uniq -c | sed 's/^ *//' | sort -nr | head -n 10) ; do
       echo "$RED$(echo $xhit | awk '{print $1}') $RESET $(echo $xhit | awk '{print $2}') "
     done
     IFS=" "
 
-    echo -e "$GREEN$(basename $0) Top 5 ports:"
+    pront "Top ports accessed"
     echo "$RED$(du -hsx $OUTPUT_DIR/* | grep "ip-list" | sort -rn | awk '{print $2}' | grep -Eo '[0-9]{1,9}' | head -n 5) $RESET"
-
-    og_it "[INFO] finished running statistics, exiting..."
     exit 0
 
 }
@@ -115,12 +135,15 @@ function gen_stats(){
 ####          [Sanity Checks]         ####
 ##########################################
 
+log_it "[INFO] checking port [$LISTEN_PORT] format for accuracy..."
 if [ -z "$LISTEN_PORT" ] ; then
     log_it "[ERROR] required configuration field [LISTEN_PORT] empty, please update and try again..." 
     exit 1
 elif [[ "$LISTEN_PORT" == "stats" ]]; then
+    echo "$(printf '%125s\n' | tr ' ' -)" >> $LOGFILE
+    log_it "[INFO] executed with [$LISTEN_PORT] command line argument, running statistics function..."
     gen_stats
-elif ! [[ "$LISTEN_PORT" =~ "^[0-9]+$" ]] ; then
+elif ! [[ "$LISTEN_PORT" =~ ^[0-9]+$ ]] ; then
     log_it "[ERROR] the listen port [$LISTEN_PORT] is invalid and contains non-numeric characters, please update and try again"
     exit 1
 fi
@@ -130,6 +153,7 @@ if [ -z "$PROTOCOL" ] ; then
     readonly PROTOCOL="tcp"
 fi
 
+log_it "[INFO[ checking $PROTOCOL availability port using [$C_METHOD]..."
 if is_port_available ; then
     STATE=""
 else
@@ -138,9 +162,11 @@ else
 fi
 
 if [ ! -d "$OUTPUT_DIR" ] ; then
-    llog_it "[ERROR] output directory [$OUTPUT_DIR], does not exist, creating now..."
+    log_it "[NOTICE] output directory [$OUTPUT_DIR], does not exist, creating now..."
     mkdir -p $OUTPUT_DIR
 fi
+
+log_it "[INFO] passed all initial sanity checks, continuing..."
 
 ##########################################
 ####              [MAIN]              ####
@@ -150,9 +176,8 @@ export OUTPUT_FILE LOGFILE SELF_PID SELF_NAME
 
 
 function tcp_pot(){
-    log_it "starting $NET_METH on port $LISTEN_PORT.."
     while [ -z "$STATE" ] ; do
-	# Note:  You can add a '-k' flag which will prevent reloading, but introduces flooding risk.
+    # Note:  You can add a '-k' flag which will prevent reloading, but introduces flooding risk.
         $NET_METH -v --send-only -4ntl -w 1 -p $LISTEN_PORT -c ./$RESPONSE_SCRIPT
         is_port_available
         # Create some separation between events to prevent flooding
@@ -162,7 +187,6 @@ function tcp_pot(){
 
 
 function udp_pot(){
-    log_it "starting $NET_METH on port $LISTEN_PORT.."
     while [ -z "$STATE" ] ; do
         # Note:  You can add a '-k' flag which will prevent reloading, but introduces flooding risk.
         $NET_METH -v --send-only -4ntl -w 1 -u -p $LISTEN_PORT -c ./$RESPONSE_SCRIPT
@@ -172,8 +196,14 @@ function udp_pot(){
     done
 }
 
+
+log_it "[NOTICE] starting $NET_METH via protocol [$PROTOCOL] listening on port $LISTEN_PORT.."
+
 if [ "$PROTOCOL" == "udp" ] ; then
     udp_pot
-else
+elif [[ "$PROTOCOL" == "tcp" ]] ; then
     tcp_pot
+else
+    log_it "[ERROR] invalid protocol [$PROTOCOL] provided at runtime, fix and try again..."
+    exit 1
 fi
